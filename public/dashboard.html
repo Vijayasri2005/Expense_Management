@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Expense Tracker Dashboard</title>
+
+  <link rel="stylesheet" href="dashboard.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Welcome to Your Dashboard 🎯</h1>
+
+    <button id="logoutBtn">Logout</button>
+
+    <!-- Period Selector & Total Summary -->
+    <div class="summary-section">
+      <label for="periodSelect">View Total For:</label>
+      <select id="periodSelect">
+        <option value="weekly">Weekly</option>
+        <option value="monthly" selected>Monthly</option>
+        <option value="yearly">Yearly</option>
+      </select>
+      <div id="totalSummary" class="total-summary">
+        Total (Monthly): ₹0
+      </div>
+    </div>
+
+    <h2>Add New Expense</h2>
+    <form id="expenseForm">
+      <input type="text" id="category" placeholder="Category (e.g. Food)" required />
+      <input type="number" id="amount" placeholder="Amount" required />
+      <input type="text" id="description" placeholder="Description" required />
+      <input type="date" id="date" required />
+      <button type="submit">Add Expense</button>
+    </form>
+
+    <h2>Your Expenses</h2>
+    <table id="expensesTable" border="1" cellpadding="10">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Amount</th>
+          <th>Description</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <br>
+    <button id="exportCsvBtn">Download CSV</button>
+    <button id="exportPdfBtn">Download PDF</button>
+
+    <hr />
+
+    <h3>Expenses by Category</h3>
+    <canvas id="categoryChart" width="300" height="300"></canvas>
+
+    <h3>Spending Over Time</h3>
+    <canvas id="trendChart" width="600" height="300"></canvas>
+  </div>
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    const token = localStorage.getItem('token');
+    if (!token) {
+      alert('You must log in first!');
+      window.location.href = 'index.html';
+    }
+
+    // Globals to store data & chart instances
+    let allExpenses = [];
+    let categoryChart, trendChart;
+
+    // Elements
+    const periodSelect = document.getElementById('periodSelect');
+    const totalSummaryDiv = document.getElementById('totalSummary');
+
+    // Logout
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      localStorage.removeItem('token');
+      window.location.href = 'index.html';
+    });
+
+    // Add Expense
+    document.getElementById('expenseForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const category = document.getElementById('category').value;
+      const amount = +document.getElementById('amount').value;
+      const description = document.getElementById('description').value;
+      const date = document.getElementById('date').value;
+
+      const res = await fetch('http://localhost:5000/api/expenses', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ category, amount, description, date })
+      });
+      const data = await res.json();
+      if (data._id) {
+        e.target.reset();
+        loadExpenses();
+      } else {
+        alert('Error adding expense.');
+      }
+    });
+
+    // When period changes, recalculate summary
+    periodSelect.addEventListener('change', () => {
+      updateSummary();
+    });
+
+    // Compute and display total for selected period
+    function updateSummary() {
+      const period = periodSelect.value;
+      const now = new Date();
+      let start;
+      if (period === 'weekly') {
+        start = new Date(now);
+        start.setDate(now.getDate() - 6);
+      } else if (period === 'monthly') {
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+      } else { // yearly
+        start = new Date(now.getFullYear(), 0, 1);
+      }
+
+      const total = allExpenses
+        .filter(e => new Date(e.date) >= start)
+        .reduce((sum, e) => sum + e.amount, 0);
+
+      const label = period.charAt(0).toUpperCase() + period.slice(1);
+      totalSummaryDiv.textContent = `Total (${label}): ₹${total}`;
+    }
+
+    // Render both charts
+    function renderCharts(expenses) {
+      // — Category Pie Chart
+      const catTotals = {};
+      expenses.forEach(exp => {
+        catTotals[exp.category] = (catTotals[exp.category] || 0) + exp.amount;
+      });
+      const catLabels = Object.keys(catTotals);
+      const catData = Object.values(catTotals);
+
+      if (categoryChart) categoryChart.destroy();
+      categoryChart = new Chart(
+        document.getElementById('categoryChart'),
+        {
+          type: 'pie',
+          data: {
+            labels: catLabels,
+            datasets: [{ data: catData, backgroundColor: ['#ff6384','#36a2eb','#ffce56','#4caf50','#9c27b0','#ff9800'] }]
+          },
+          options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+        }
+      );
+
+      // — Trend Line Chart
+      const dateTotals = {};
+      expenses.forEach(exp => {
+        const d = new Date(exp.date).toLocaleDateString();
+        dateTotals[d] = (dateTotals[d] || 0) + exp.amount;
+      });
+      const sortedDates = Object.keys(dateTotals).sort((a,b)=> new Date(a) - new Date(b));
+      const trendData = sortedDates.map(d => dateTotals[d]);
+
+      if (trendChart) trendChart.destroy();
+      trendChart = new Chart(
+        document.getElementById('trendChart'),
+        {
+          type: 'line',
+          data: {
+            labels: sortedDates,
+            datasets: [{
+              label: '₹ Spent',
+              data: trendData,
+              fill: false,
+              borderColor: '#42a5f5',
+              tension: 0.3
+            }]
+          },
+          options: { responsive: true, scales: { y: { beginAtZero: true } } }
+        }
+      );
+    }
+
+    // Load expenses from backend
+    async function loadExpenses() {
+      const res = await fetch('http://localhost:5000/api/expenses', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const expenses = await res.json();
+      allExpenses = expenses;
+
+      // Populate table
+      const tbody = document.querySelector('#expensesTable tbody');
+      tbody.innerHTML = '';
+      expenses.forEach(exp => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${exp.category}</td>
+          <td>${exp.amount}</td>
+          <td>${exp.description}</td>
+          <td>${new Date(exp.date).toLocaleDateString()}</td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      // Update summary & charts
+      updateSummary();
+      renderCharts(expenses);
+    }
+
+    // CSV Download
+    document.getElementById('exportCsvBtn').addEventListener('click', () => {
+      fetch('http://localhost:5000/api/expenses/export/csv', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      .then(r => r.blob())
+      .then(blob => {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'expenses.csv';
+        link.click();
+      });
+    });
+
+    // PDF Download
+    document.getElementById('exportPdfBtn').addEventListener('click', () => {
+      fetch('http://localhost:5000/api/expenses/export/pdf', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      .then(r => r.blob())
+      .then(blob => {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'expenses.pdf';
+        link.click();
+      });
+    });
+
+    // Initial load
+    loadExpenses();
+  </script>
+</body>
+</html>
