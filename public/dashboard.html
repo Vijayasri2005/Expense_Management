@@ -92,7 +92,7 @@
       const description = document.getElementById('description').value;
       const date = document.getElementById('date').value;
 
-      const res = await fetch('http://localhost:5000/api/expenses', {
+      const res = await fetch('/api/expenses', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -190,7 +190,7 @@
 
     // Load expenses from backend
     async function loadExpenses() {
-      const res = await fetch('http://localhost:5000/api/expenses', {
+      const res = await fetch('/api/expenses', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const expenses = await res.json();
@@ -217,7 +217,7 @@
 
     // CSV Download
     document.getElementById('exportCsvBtn').addEventListener('click', () => {
-      fetch('http://localhost:5000/api/expenses/export/csv', {
+      fetch('/api/expenses/export/csv', {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       .then(r => r.blob())
@@ -231,7 +231,7 @@
 
     // PDF Download
     document.getElementById('exportPdfBtn').addEventListener('click', () => {
-      fetch('http://localhost:5000/api/expenses/export/pdf', {
+      fetch('/api/expenses/export/pdf', {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       .then(r => r.blob())

@@ -19,7 +19,7 @@ document.getElementById('loginForm').addEventListener('submit', function (e) {
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
 
-    fetch('http://localhost:5000/api/auth/login', {
+    fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -50,7 +50,7 @@ document.getElementById('signupForm').addEventListener('submit', function (e) {
     const email = document.getElementById('signupEmail').value;
     const password = document.getElementById('signupPassword').value;
 
-    fetch('http://localhost:5000/api/auth/signup', {
+    fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password })
@@ -80,7 +80,7 @@ document.getElementById('exportCsvBtn').addEventListener('click', function () {
         return;
     }
 
-    fetch('http://localhost:5000/api/expenses/export/csv', {
+    fetch('/api/expenses/export/csv', {
         method: 'GET',
         headers: {
             'Authorization': `Bearer ${token}`
@@ -106,7 +106,7 @@ document.getElementById('exportPdfBtn').addEventListener('click', function () {
         return;
     }
 
-    fetch('http://localhost:5000/api/expenses/export/pdf', {
+    fetch('/api/expenses/export/pdf', {
         method: 'GET',
         headers: {
             'Authorization': `Bearer ${token}`
